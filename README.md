@@ -35,13 +35,13 @@ This integration equips ERPNext users with the necessary tools to comply with Eg
 
 ```bash
 # Navigate to your Frappe bench directory
-cd /path/to/your/frappe-bench
+cd ~/frappe-bench
 
 # Install the app using bench
-bench get-app erpnext_egypt_compliance https://github.com/Axentorllc/erpnext_egypt_compliance.git
+bench get-app erpnext_egypt_compliance https://github.com/AlazabDev/erpnext_egypt_compliance.git
 
 # Install the app on your site
-bench --site your-site.com install-app erpnext_egypt_compliance
+bench --site erp.alazab.com install-app erpnext_egypt_compliance
 
 # Build assets
 bench build
