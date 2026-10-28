@@ -15,6 +15,8 @@ import base64
 @frappe.whitelist()
 def get_invoice_names_to_sign(company):
     connector = get_company_eta_connector(company)
+    if not connector:
+        return []
     docstatus = ["1"]
     if connector.get("all_docstatus"):
         docstatus = ["0", "1"]
@@ -34,12 +36,10 @@ def get_invoice_names_to_sign(company):
 @frappe.whitelist()
 def get_eta_invoice_for_signer(docname):
     try:
-        frappe.set_value("Sales Invoice", docname, "eta_signature_date", datetime.today())
-        frappe.set_value("Sales Invoice", docname, "eta_signature_time", datetime.now())
-        frappe.db.commit()
-
+        invoice = frappe.get_doc("Sales Invoice", docname)
+        invoice.check_permission("read")
         inv = get_invoice_asjson(docname, as_dict=True)
-        inv.pop("signatures")
+        inv.pop("signatures", None)
         inv["documentTypeVersion"] = "1.0"
         return inv
     except Exception as e:
@@ -53,10 +53,15 @@ def get_eta_invoice_for_signer(docname):
 
 @frappe.whitelist()
 def set_invoice_signature(docname, signature, doctype="Sales Invoice"):
+    if doctype != "Sales Invoice":
+        frappe.throw("Only Sales Invoice signatures are supported")
+    invoice = frappe.get_doc("Sales Invoice", docname)
+    invoice.check_permission("write")
+    if invoice.docstatus != 1 or invoice.get("eta_submission_id") or invoice.get("eta_status"):
+        frappe.throw("Only submitted, not-yet-sent invoices can be signed")
     is_valid_base64(signature)
-    frappe.set_value(doctype, docname, "eta_signature", signature)
-    
-    company = frappe.get_value("Sales Invoice", docname, "company")
+    invoice.db_set("eta_signature", signature, update_modified=True)
+    company = invoice.company
     connector = get_company_eta_connector(company)
     if connector and connector.submission_mode=='Live':
         enqueue_invoice_live_submission(docname ,connector)
@@ -73,7 +78,6 @@ def enqueue_invoice_live_submission(docname , connector):
             method="erpnext_egypt_compliance.erpnext_eta.main.autosubmit_eta_live_submission",
             queue="short",
             docname=docname,
-            connector=connector,
             job_name=f"eta_submission_{docname}"
         )
         frappe.log_error(f"Invoice {docname} queued for ETA submission")
@@ -84,4 +88,11 @@ def enqueue_invoice_live_submission(docname , connector):
 
 
 def is_valid_base64(signature):
-  base64.b64decode(signature, validate=True)
+    if not isinstance(signature, str) or not signature.strip():
+        frappe.throw("Signature must be non-empty Base64")
+    try:
+        decoded = base64.b64decode(signature, validate=True)
+    except (ValueError, base64.binascii.Error):
+        frappe.throw("Invalid signature Base64")
+    if not decoded:
+        frappe.throw("Signature cannot be empty")
