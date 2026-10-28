@@ -31,7 +31,8 @@ class EInvoiceSubmitter:
     def _send_submit_request(self, data):
         url = self.eta_connector.DOCUMET_SUBMISSION
         headers = self.eta_connector.get_headers()
-        response = self.eta_connector.session.post(url, headers=headers, data=data)
+        response = self.eta_connector.session.post(url, headers=headers, data=data, timeout=60)
+        response.raise_for_status()
         _eta_response = frappe._dict(response.json())
         _eta_response["status_code"] = response.status_code or None
         return _eta_response
@@ -44,7 +45,7 @@ class EInvoiceSubmitter:
             frappe.throw("No UUID found for the Sales Invoice")
 
         document_url = f"{self.eta_connector.ETA_BASE}/documents/{uuid}/pdf"
-        response = self.eta_connector.session.get(document_url, headers=headers)
+        response = self.eta_connector.session.get(document_url, headers=headers, timeout=60)
         
         if response.status_code == 200:
             frappe.local.response.filename = f"eta_invoice_{docname}.pdf"
@@ -72,7 +73,7 @@ class EInvoiceSubmitter:
             "reason": reason
         }).encode("utf8")
                 
-        response = self.eta_connector.session.put(url, headers=headers, data=data)
+        response = self.eta_connector.session.put(url, headers=headers, data=data, timeout=60)
         eta_response = frappe._dict({})
         
         eta_response["status_code"] = response.status_code
@@ -101,8 +102,9 @@ class EInvoiceSubmitter:
             "PageNo": str(page_no)
         })
         url = f"{self.eta_connector.ETA_BASE}/documentSubmissions/{submission_id}"
+        response = None
         try:
-            response = self.eta_connector.session.get(url, headers=headers)
+            response = self.eta_connector.session.get(url, headers=headers, timeout=60)
             response.raise_for_status()
             return response.json()
         except Exception as e:
