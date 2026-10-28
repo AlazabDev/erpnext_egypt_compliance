@@ -2,7 +2,7 @@
 line-length = 120
 
 [tool.pytest.ini_options]
-addopts = "-p no:warnings -vvs --sites-path=/workspace/development/frappe-bench-14/sites"
+addopts = "-p no:warnings -vvs --sites-path=/home/runner/frappe-bench/sites"
 
 [project]
 name = "erpnext_egypt_compliance"
@@ -10,7 +10,7 @@ version = "0.0.1"
 dependencies = ["pytest_frappe", "pydantic"]
 
 [tool.bench.frappe-dependencies]
-frappe = ">=15.0.0,<16.0.0-dev"
+frappe = ">=16.0.0,<17.0.0-dev"
 
 [tool.ruff]
 select = [
