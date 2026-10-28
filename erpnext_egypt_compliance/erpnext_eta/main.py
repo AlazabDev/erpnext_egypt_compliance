@@ -56,18 +56,19 @@ def get_batch_invoices(company):
         einvoices=[]
         connector = get_company_eta_connector(company)
         
-        if connector.submission_mode=="Manual":
+        if not connector or connector.submission_mode != "Batch":
             return
 
         batch_size=connector.eta_batch_size or 10
         docs = frappe.get_all(
             "Sales Invoice",
             filters=[
+                ["company", "=", company],
                 ["eta_signature", "!=", ""],
                 ["docstatus", "=", 1],
                 ["eta_status", "=", ""],
                 ["eta_submission_id", "=", ""],
-                ["posting_date", "=", nowdate()],  # ✅ only today's invoices
+                ["posting_date", "<=", nowdate()],  # Include older pending invoices
             ],
             pluck="name",
             limit=batch_size,
@@ -96,7 +97,7 @@ def get_batch_invoices(company):
                
                  
     except Exception as e:
-        frappe.log_error("Auto Submission Error", f"Failed to submit e-invoice  {0}").format(str(e))
+        frappe.log_error(title="ETA Auto Submission Error", message=str(e))
         
 
 def autosubmit_eta_batch_process():
@@ -106,12 +107,18 @@ def autosubmit_eta_batch_process():
         try:
             get_batch_invoices(company)
         except Exception as e:
-            frappe.log_error("Auto Submission Error").format(str(e))
+            frappe.log_error(title="ETA Batch Process Error", message=str(e))
 
 
-def autosubmit_eta_live_submission(docname, connector):
+def autosubmit_eta_live_submission(docname, connector=None):
+    invoice = frappe.get_doc("Sales Invoice", docname)
+    if invoice.docstatus != 1 or invoice.get("eta_submission_id") or invoice.get("eta_status") or not invoice.get("eta_signature"):
+        return
+    connector = get_company_eta_connector(invoice.company)
+    if not connector or connector.submission_mode != "Live":
+        return
     inv = get_invoice_asjson(docname, as_dict=True)
-    submit_einvoice_background_logger(inv, connector, submitted_by="Agent")
+    submit_einvoice_background_logger([inv], connector, submitted_by="Agent")
 
 
 @frappe.whitelist()
